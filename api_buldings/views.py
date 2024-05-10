@@ -2,6 +2,7 @@ import django_filters
 import geojson
 from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D
+from django.http import Http404
 from rest_framework import viewsets
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -24,7 +25,11 @@ class BuildingViewSet(viewsets.ModelViewSet):
         return context
 
     def retrieve(self, request, *args, **kwargs):
-        instance = self.get_object()
+        #instance = self.get_object()
+        try:
+            instance = self.queryset.get(pk=kwargs["pk"])
+        except Exception:
+            raise Http404("Building matching query does not exist")
         feature = self.serializer_class(instance, context=self.get_serializer_context()).data
         return Response(feature)
 

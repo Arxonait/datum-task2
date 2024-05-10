@@ -69,7 +69,7 @@ class BuildingSerializer(serializers.ModelSerializer):
         if "area" not in request.query_params:
             fields.pop("area")
         if (not BuildingFilter.get_name_data_for_max_distance().issubset(set(request.query_params.keys())) or
-                request.method == "POST"):
+                request.method != "GET"):
             fields.pop("distance_to_target_point")
         return fields
 
@@ -79,8 +79,11 @@ class BuildingSerializer(serializers.ModelSerializer):
         properties = {}
         for target_field in target_fields:
             if target_field not in (self.Meta.id_field, self.Meta.geo_field):
-                value = instance.__getattribute__(target_field)
-                properties[target_field] = value
+                try:
+                    value = instance.__getattribute__(target_field)
+                    properties[target_field] = value
+                except AttributeError as e:
+                    print(f"LOG --- serializers buildings --- {e.args[0]}")
 
         cords = geojson.Polygon(instance.geom.coords[0])
 

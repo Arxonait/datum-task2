@@ -1,7 +1,6 @@
 from django.contrib.gis.db.models.functions import Distance
 import django_filters
 from django.contrib.gis.geos import Point
-from django.contrib.gis.measure import D
 
 from api_buldings.models import Building
 
@@ -21,7 +20,7 @@ class BuildingFilter(django_filters.FilterSet):
             ref_point = Point(float(longitude), float(latitude), srid=4326)
             queryset = queryset.annotate(distance=Distance('geom', ref_point))
             queryset = queryset.filter(distance__lt=int(value))
-            queryset = queryset.annotate(distance=Distance('geom', ref_point))
+            #queryset = queryset.annotate(distance=Distance('geom', ref_point))
         return queryset
 
     @classmethod

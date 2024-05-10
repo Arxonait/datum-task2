@@ -8,5 +8,5 @@ router.register(r"buildings", BuildingViewSet)
 
 
 urlpatterns = [
-    path("", include(router.urls)),
+    path("", include(router.urls), name="buildings"),
 ]
