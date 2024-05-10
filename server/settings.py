@@ -30,7 +30,7 @@ SECRET_KEY = "django-insecure-t4)r0c&g2i3%92bb7_sl=mybh-9c7&a4eqn0zk@mt6hg&8)#9y
 DEBUG = True
 
 ALLOWED_HOSTS = ['127.0.0.1']
-GDAL_LIBRARY_PATH = r"C:\OSGeo4W\bin\gdal308.dll"
+GDAL_LIBRARY_PATH = os.getenv("GDAL_LIBRARY")
 
 # Application definition
 
@@ -86,8 +86,8 @@ DATABASES = {
         'NAME': os.getenv("NAME_DB"),
         'USER': os.getenv("USER_DB"),
         'PASSWORD': os.getenv("PASSWORD_DB"),
-        'HOST': 'localhost',
-        'PORT': 5432,
+        'HOST': os.getenv("HOST_DB"),
+        'PORT': os.getenv("PORT_DB"),
     }
 }
 
