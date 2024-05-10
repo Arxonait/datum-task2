@@ -68,7 +68,7 @@ class BuildingSerializer(serializers.ModelSerializer):
 
         if "area" not in request.query_params:
             fields.pop("area")
-        if (not BuildingFilter.get_name_data_for_max_distance().issubset(set(request.query_params.keys())) or
+        if (not {"longitude", "latitude"}.issubset(set(request.query_params.keys())) or
                 request.method != "GET"):
             fields.pop("distance_to_target_point")
         return fields

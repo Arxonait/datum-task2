@@ -140,14 +140,12 @@ class BuildingsFilterTestsCollection(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Feature")
-        self.assertNotContains(response, "distance_to_target_point")
 
     def test_get_buildings_with_wrong_format_filter_point(self):
         longitude_t, latitude_t = TEST_POINT1
         max_distance_t = 3000
         test_data = [(None, latitude_t, max_distance_t),
-                     (longitude_t, None, max_distance_t),
-                     (longitude_t, latitude_t, None)]
+                     (longitude_t, None, max_distance_t),]
         count = len(Building.objects.all())
 
         for longitude, latitude, max_distance in test_data:

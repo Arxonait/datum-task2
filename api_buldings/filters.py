@@ -17,12 +17,5 @@ class BuildingFilter(django_filters.FilterSet):
         latitude = self.request.GET.get('latitude')
 
         if longitude and latitude and value:
-            ref_point = Point(float(longitude), float(latitude), srid=4326)
-            queryset = queryset.annotate(distance=Distance('geom', ref_point))
             queryset = queryset.filter(distance__lt=int(value))
-            #queryset = queryset.annotate(distance=Distance('geom', ref_point))
         return queryset
-
-    @classmethod
-    def get_name_data_for_max_distance(cls):
-        return {"max_distance", "longitude", "latitude"}

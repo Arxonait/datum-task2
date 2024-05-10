@@ -1,5 +1,6 @@
 import django_filters
 import geojson
+from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D
 from django.http import Http404
@@ -18,6 +19,16 @@ class BuildingViewSet(viewsets.ModelViewSet):
     filter_backends = [django_filters.rest_framework.DjangoFilterBackend]
     filterset_class = BuildingFilter
 
+    def get_queryset(self):
+        longitude = self.request.GET.get('longitude')
+        latitude = self.request.GET.get('latitude')
+        queryset = self.queryset
+        if longitude and latitude:
+            ref_point = Point(float(longitude), float(latitude), srid=4326)
+            queryset = self.queryset.annotate(distance=Distance('geom', ref_point))
+        self.queryset = queryset
+        return queryset
+
     def get_serializer_context(self):
         context = {
             'request': self.request
@@ -27,7 +38,7 @@ class BuildingViewSet(viewsets.ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         #instance = self.get_object()
         try:
-            instance = self.queryset.get(pk=kwargs["pk"])
+            instance = self.get_queryset().get(pk=kwargs["pk"])
         except Exception:
             raise Http404("Building matching query does not exist")
         feature = self.serializer_class(instance, context=self.get_serializer_context()).data
