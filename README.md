@@ -23,5 +23,5 @@ python .\manage.py migrate
 ```
 Запуск
 ```
-python .\manage.py runserver <url>
+python .\manage.py runserver
 ```
