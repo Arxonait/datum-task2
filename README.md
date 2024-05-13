@@ -5,7 +5,6 @@
 ```
 conda env create -n <name-env> -f environment.yaml
 conda activate <name-env>
-
 ```
 Создать файл .env 
 ```
@@ -15,10 +14,10 @@ PASSWORD_DB=...
 HOST_DB=...
 PORT_DB=...
 GDAL_LIBRARY= ... + .dll
+OSGEO4W= ... (Ex: C:\OSGeo4W)
 ```
 Создание таблиц бд
 ```
-python .\manage.py makemigrations
 python .\manage.py migrate
 ```
 Запуск
