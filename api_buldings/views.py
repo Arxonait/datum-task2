@@ -1,11 +1,6 @@
 import django_filters
-import geojson
-from django.contrib.gis.db.models.functions import Distance
-from django.contrib.gis.geos import Point
-from django.contrib.gis.measure import D
 from django.http import Http404
 from rest_framework import viewsets
-from rest_framework.request import Request
 from rest_framework.response import Response
 
 from api_buldings.filters import BuildingFilter
@@ -18,16 +13,6 @@ class BuildingViewSet(viewsets.ModelViewSet):
     serializer_class: BuildingSerializer = BuildingSerializer
     filter_backends = [django_filters.rest_framework.DjangoFilterBackend]
     filterset_class = BuildingFilter
-
-    def get_queryset(self):
-        longitude = self.request.GET.get('longitude')
-        latitude = self.request.GET.get('latitude')
-        queryset = self.queryset
-        if longitude and latitude:
-            ref_point = Point(float(longitude), float(latitude), srid=4326)
-            queryset = self.queryset.annotate(distance=Distance('geom', ref_point))
-        self.queryset = queryset
-        return queryset
 
     def get_serializer_context(self):
         context = {
@@ -45,23 +30,15 @@ class BuildingViewSet(viewsets.ModelViewSet):
         return Response(feature)
 
     def list(self, request, *args, **kwargs):
+
         queryset = self.filter_queryset(self.get_queryset())
-        data = self.filter_after_queryset(request, queryset)
 
         features = [self.serializer_class(instance, context=self.get_serializer_context()).data
-                    for instance in data]
-        feature_collection = geojson.FeatureCollection(features)
+                    for instance in queryset]
+        feature_collection = {
+            "type": "FeatureCollection",
+            "features": features
+        }
 
         return Response(feature_collection)
 
-    def filter_after_queryset(self, request: Request, queryset):
-        min_area = int(request.query_params.get("min_area", -1))
-        max_area = int(request.query_params.get("max_area", -1))
-
-        result = []
-        for instance in queryset:
-            result.append(instance)
-            area = instance.area
-            if min_area != -1 and min_area >= area or max_area != -1 and max_area <= area:
-                result.pop()
-        return result

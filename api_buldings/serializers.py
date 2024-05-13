@@ -1,19 +1,17 @@
-import geojson
-from django.contrib.gis.geos import Polygon
+import json
+
+from django.contrib.gis.geos import GEOSGeometry
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.request import Request
 
-from api_buldings.filters import BuildingFilter
 from api_buldings.models import Building
-from api_buldings.validators import ValidatorFeatureFormat, ValidatorPolygon, ValidatorWKTPolygonFormat, \
-    ValidatorPropertiesBuildings
 
 
 class BuildingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Building
-        fields = ("id", "address", "geom", "area", "distance_to_target_point")
+        fields = ("id", "address", "geom")
         id_field = "id"
         geo_field = "geom"
 
@@ -21,58 +19,46 @@ class BuildingSerializer(serializers.ModelSerializer):
         if data.get("address") or data.get("geom"):
             internal_value = data
         elif data.get("type") == "Feature":
-            internal_value = self.validate_feature(data)
+            internal_value = self.parse_feature(data)
         else:
             raise ValidationError({"detail": "wrong format"})
         internal_value = super().to_internal_value(internal_value)
         return internal_value
 
     def validate_geom(self, value):
-        if isinstance(value, Polygon):
-            return value
-
         try:
-            wkt_coordinates = ValidatorWKTPolygonFormat(geom=value)
-            ValidatorPolygon(coordinates=wkt_coordinates.geom)
+            polygon = GEOSGeometry(value)
         except Exception as e:
-            raise ValidationError(e.errors())
-        return value
+            raise ValidationError([str(e)])
 
-    def validate_feature(self, data: dict):
+        if polygon.geom_type != "Polygon":
+            raise ValidationError(["geom must be Polygon"])
+
+        if polygon.srid != 4326:
+            raise ValidationError(["geom must be srid:4326"])
+
+        for coord in polygon.coords[0]:
+            if not (isinstance(coord[0], float) and isinstance(coord[1], float)):
+                raise ValidationError(["longitude, latitude must be float"])
+            if not (-180. < coord[0] < 180. and -90. < coord[1] < 90.):
+                raise ValidationError(["wrong range longitude, latitude"])
+
+        return polygon
+
+    def parse_feature(self, data: dict):
         internal_value = {}
-        try:
-            validate_data = ValidatorFeatureFormat(**data)
-        except Exception as e:
-            raise ValidationError({"detail": e.errors()})
+        if not (isinstance(data["type"], str) and isinstance(data["geometry"], dict)
+                and isinstance(data["properties"], dict)):
+            raise ValidationError({"detail": "wrong feature format"})
 
-        if validate_data.geometry.type.lower() != "polygon":
-            raise ValidationError({"detail": ["geometry type must be polygon"]})
+        internal_value["geom"] = json.dumps(data['geometry'])
 
-        try:
-            polygon = ValidatorPolygon(**validate_data.geometry.model_dump())
-        except Exception as e:
-            raise ValidationError({"detail": e.errors()})
-
-        internal_value["geom"] = Polygon(polygon.coordinates)
-
-        valid_properties = ValidatorPropertiesBuildings(**validate_data.properties)
-        if valid_properties.address is not None:
-            internal_value["address"] = data["properties"].get("address")
+        internal_value.update(data["properties"])
         return internal_value
 
     def get_fields(self):
         fields = super(BuildingSerializer, self).get_fields()
         request: Request = self.context.get("request")
-        if request is None:
-            fields.pop("area")
-            fields.pop("distance_to_target_point")
-            return fields
-
-        if "area" not in request.query_params:
-            fields.pop("area")
-        if (not {"longitude", "latitude"}.issubset(set(request.query_params.keys())) or
-                request.method != "GET"):
-            fields.pop("distance_to_target_point")
         return fields
 
     def to_representation(self, instance):
@@ -84,10 +70,13 @@ class BuildingSerializer(serializers.ModelSerializer):
                 try:
                     value = instance.__getattribute__(target_field)
                     properties[target_field] = value
-                except AttributeError as e:
-                    print(f"LOG --- serializers buildings --- {e.args[0]}")
+                except:
+                    continue
 
-        cords = geojson.Polygon(instance.geom.coords[0])
-
-        result = geojson.Feature(id=instance.pk, geometry=cords, properties=properties)
+        result = {
+            "type": "Feature",
+            "geometry": instance.geom.geojson,
+            "id": instance.pk,
+            "properties": properties
+        }
         return result

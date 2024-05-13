@@ -32,6 +32,13 @@ DEBUG = True
 ALLOWED_HOSTS = ['127.0.0.1']
 GDAL_LIBRARY_PATH = os.getenv("GDAL_LIBRARY")
 
+OSGEO4W = os.getenv("OSGEO4W")
+assert os.path.isdir(OSGEO4W), "Directory does not exist: " + OSGEO4W
+os.environ['OSGEO4W_ROOT'] = OSGEO4W
+os.environ['GDAL_DATA'] = OSGEO4W + r"\share\gdal"
+os.environ['PROJ_LIB'] = OSGEO4W + r"\share\proj"
+os.environ['PATH'] = OSGEO4W + r"\bin;" + os.environ['PATH']
+
 # Application definition
 
 INSTALLED_APPS = [
