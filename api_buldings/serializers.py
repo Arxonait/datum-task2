@@ -19,14 +19,18 @@ class BuildingSerializer(serializers.ModelSerializer):
 
     def to_internal_value(self, data):
         if data.get("address") or data.get("geom"):
-            internal_value = super().to_internal_value(data)
+            internal_value = data
         elif data.get("type") == "Feature":
             internal_value = self.validate_feature(data)
         else:
             raise ValidationError({"detail": "wrong format"})
+        internal_value = super().to_internal_value(internal_value)
         return internal_value
 
     def validate_geom(self, value):
+        if isinstance(value, Polygon):
+            return value
+
         try:
             wkt_coordinates = ValidatorWKTPolygonFormat(geom=value)
             ValidatorPolygon(coordinates=wkt_coordinates.geom)
@@ -52,10 +56,8 @@ class BuildingSerializer(serializers.ModelSerializer):
         internal_value["geom"] = Polygon(polygon.coordinates)
 
         valid_properties = ValidatorPropertiesBuildings(**validate_data.properties)
-        if not valid_properties.address and self.context.get("request").method == "PUT":
-            raise ValidationError({"detail": ["address is required"]})
-
-        internal_value["address"] = data["properties"].get("address")
+        if valid_properties.address is not None:
+            internal_value["address"] = data["properties"].get("address")
         return internal_value
 
     def get_fields(self):
