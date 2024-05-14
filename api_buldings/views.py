@@ -16,29 +16,25 @@ class BuildingViewSet(viewsets.ModelViewSet):
     filter_backends = [django_filters.rest_framework.DjangoFilterBackend]
     filterset_class = BuildingFilter
 
-    def get_queryset(self):
-        queryset = self.queryset
-
+    def get_serializer_context(self):
+        context = {}
         if "area" in self.request.query_params:
-            queryset = queryset.annotate(area=Area('geom'))
-
+            context["area"] = True
         if "latitude" in self.request.query_params and "longitude" in self.request.query_params:
             longitude = self.request.GET.get('longitude')
             latitude = self.request.GET.get('latitude')
             ref_point = Point(float(longitude), float(latitude), srid=4326)
-            queryset = queryset.annotate(distance=Distance('geom', ref_point))
-
-        return queryset
+            context["target_point"] = ref_point
+        return context
 
     def retrieve(self, request, *args, **kwargs):
-        try:
-            instance = self.get_queryset().get(pk=kwargs["pk"])
-        except Exception:
+        queryset = self.get_queryset().filter(pk=kwargs["pk"])
+        if len(queryset) != 1:
             raise Http404("Building matching query does not exist")
-        feature = self.serializer_class(instance, context=self.get_serializer_context()).data
+        feature = self.serializer_class(queryset, context=self.get_serializer_context()).data
         return Response(feature)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
-        feature_collection = self.serializer_class(queryset, context=self.get_serializer_context()).data
+        feature_collection = self.serializer_class(queryset, context=self.get_serializer_context(), single=False).data
         return Response(feature_collection)

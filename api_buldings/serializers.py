@@ -1,5 +1,6 @@
 import json
 
+from django.contrib.gis.db.models.functions import Distance, Area
 from django.contrib.gis.geos import GEOSGeometry, Polygon
 from django.db.models import QuerySet
 from rest_framework import serializers
@@ -15,6 +16,10 @@ class BuildingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Building
         fields = ("id", "address", "geom", "area", "distance")
+
+    def __init__(self, *args, single=True, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.single = single
 
     def to_internal_value(self, data):
         if data.get("address") or data.get("geom"):
@@ -41,7 +46,7 @@ class BuildingSerializer(serializers.ModelSerializer):
         for coord in polygon.coords[0]:
             if not (-180.0 <= coord[0] <= 180.0 and -90.0 <= coord[1] <= 90.0):
                 raise ValidationError([
-                                          "Coordinates out of range: longitude must be between -180 and 180, latitude must be between -90 and 90"])
+                    "Coordinates out of range: longitude must be between -180 and 180, latitude must be between -90 and 90"])
         return polygon
 
     def get_area(self, obj):
@@ -67,14 +72,29 @@ class BuildingSerializer(serializers.ModelSerializer):
         internal_value.update(data["properties"])
         return internal_value
 
-    def to_representation(self, instance):
-        if isinstance(instance, QuerySet):
+    def change_queryset_serializers_context(self, queryset):
+        context = self.context
+        if "area" in context:
+            queryset = queryset.annotate(area=Area('geom'))
+
+        if "target_point" in context:
+            ref_point = context.get("target_point")
+            queryset = queryset.annotate(distance=Distance('geom', ref_point))
+        return queryset
+
+    def to_representation(self, queryset: QuerySet):
+        if not isinstance(queryset, QuerySet) and self.single == True:
+            return self.to_representation_single(queryset)
+
+        instances = self.change_queryset_serializers_context(queryset)
+        if not self.single:
             feature_collection = {
                 "type": "FeatureCollection",
-                "features": [self.to_representation_single(obj) for obj in instance]
+                "features": [self.to_representation_single(obj) for obj in instances]
             }
             return feature_collection
         else:
+            instance = instances[0]
             return self.to_representation_single(instance)
 
     def to_representation_single(self, instance):
