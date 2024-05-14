@@ -1,21 +1,19 @@
 from math import inf
 
-import geojson
-from geojson import Polygon
+from django.contrib.gis.geos import Polygon
 from django.test import TestCase
-from django.urls import reverse
 
 from api_buldings.models import Building
 
 # Create your tests here.
 TEST_GEOM = "POLYGON ((19.298488064150035 43.510902041818866, 19.528309386031935 43.24686866222709, 20.179459092915266 42.82572783537185, 19.298488064150035 43.510902041818866))"
-TEST_POLYGON = Polygon(((19.298488064150035, 43.510902041818866),
-                        (19.528309386031935, 43.24686866222709),
-                        (20.179459092915266, 42.82572783537185),
-                        (19.298488064150035, 43.510902041818866)))
-NOT_CLOSED_POLYGON = Polygon(((19.298488064150035, 43.510902041818866),
-                              (19.528309386031935, 43.24686866222709),
-                              (20.179459092915266, 42.82572783537185)))
+TEST_POLYGON = ((19.298488064150035, 43.510902041818866),
+                (19.528309386031935, 43.24686866222709),
+                (20.179459092915266, 42.82572783537185),
+                (19.298488064150035, 43.510902041818866))
+NOT_CLOSED_POLYGON = ((19.298488064150035, 43.510902041818866),
+                      (19.528309386031935, 43.24686866222709),
+                      (20.179459092915266, 42.82572783537185))
 TEST_POINT1 = (39.67012990906166436, 47.21085518012574767)
 TEST_POINT2 = (39.67416330589383477, 47.21440557674531391)
 
@@ -36,14 +34,31 @@ class BuildingsCRUDTestsCollection(TestCase):
 
     def test_create_feature(self):
         url = "/api/buildings/"
-        geo_json = geojson.Feature(geometry=TEST_POLYGON, properties={"address": "test"})
+
+        geo_json = {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [TEST_POLYGON]
+            },
+            "properties": {"address": "test"}
+        }
+
         response = self.client.post(url, data=geo_json, content_type="application/json")
         self.assertEqual(response.status_code, 201)
 
     def test_create_not_close_polygon(self):
         url = "/api/buildings/"
-        geo_json = geojson.Feature(geometry=NOT_CLOSED_POLYGON,
-                                   properties={"address": "test"})
+
+        geo_json = {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [NOT_CLOSED_POLYGON]
+            },
+            "properties": {"address": "test"}
+        }
+
         response = self.client.post(url, data=geo_json, content_type="application/json")
         self.assertEqual(response.status_code, 400)
 
@@ -67,7 +82,16 @@ class BuildingsCRUDTestsCollection(TestCase):
     def test_put_buildings_feature(self):
         url = "/api/buildings/14/"
         change_address = "new address 2"
-        geo_json = geojson.Feature(geometry=TEST_POLYGON, properties={"address": change_address})
+
+        geo_json = {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [TEST_POLYGON]
+            },
+            "properties": {"address": change_address}
+        }
+
         response = self.client.put(url, data=geo_json, content_type="application/json")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["properties"].get("address"), change_address)
@@ -119,13 +143,10 @@ class BuildingsFilterTestsCollection(TestCase):
             else:
                 max_area = inf
 
-            buildings_filtrate = list(filter(lambda item: min_area < item.area < max_area, buildings))
-
             response = self.client.get(url)
             self.assertEqual(response.status_code, 200)
 
             features = response.json()["features"]
-            self.assertEqual(len(buildings_filtrate), len(buildings_filtrate))
 
             for feature in features:
                 feature_area = feature["properties"]["area"]
@@ -145,7 +166,7 @@ class BuildingsFilterTestsCollection(TestCase):
         longitude_t, latitude_t = TEST_POINT1
         max_distance_t = 3000
         test_data = [(None, latitude_t, max_distance_t),
-                     (longitude_t, None, max_distance_t),]
+                     (longitude_t, None, max_distance_t), ]
         count = len(Building.objects.all())
 
         for longitude, latitude, max_distance in test_data:
@@ -162,7 +183,7 @@ class BuildingsFilterTestsCollection(TestCase):
 
             count_response = len(response.json()["features"])
             self.assertEqual(count, count_response)
-            self.assertNotContains(response, "distance_to_target_point")
+            self.assertNotContains(response, "distance")
 
     def test_get_buildings_with_filter_point(self):
         longitude_t1, latitude_t1 = TEST_POINT1
@@ -180,5 +201,5 @@ class BuildingsFilterTestsCollection(TestCase):
             self.assertEqual(response.status_code, 200)
             features = response.json()["features"]
             for feature in features:
-                distance_to_target_point = feature["properties"]["distance_to_target_point"]
+                distance_to_target_point = feature["properties"]["distance"]
                 self.assertLess(distance_to_target_point, max_distance)

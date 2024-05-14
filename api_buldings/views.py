@@ -1,4 +1,6 @@
 import django_filters
+from django.contrib.gis.db.models.functions import Distance, Area
+from django.contrib.gis.geos import Point
 from django.http import Http404
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -14,14 +16,21 @@ class BuildingViewSet(viewsets.ModelViewSet):
     filter_backends = [django_filters.rest_framework.DjangoFilterBackend]
     filterset_class = BuildingFilter
 
-    def get_serializer_context(self):
-        context = {
-            'request': self.request
-        }
-        return context
+    def get_queryset(self):
+        queryset = self.queryset
+
+        if "area" in self.request.query_params:
+            queryset = queryset.annotate(area=Area('geom'))
+
+        if "latitude" in self.request.query_params and "longitude" in self.request.query_params:
+            longitude = self.request.GET.get('longitude')
+            latitude = self.request.GET.get('latitude')
+            ref_point = Point(float(longitude), float(latitude), srid=4326)
+            queryset = queryset.annotate(distance=Distance('geom', ref_point))
+
+        return queryset
 
     def retrieve(self, request, *args, **kwargs):
-        #instance = self.get_object()
         try:
             instance = self.get_queryset().get(pk=kwargs["pk"])
         except Exception:
@@ -31,6 +40,5 @@ class BuildingViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
-        feature_collection = self.serializer_class(list(queryset), context=self.get_serializer_context()).data
+        feature_collection = self.serializer_class(queryset, context=self.get_serializer_context()).data
         return Response(feature_collection)
-

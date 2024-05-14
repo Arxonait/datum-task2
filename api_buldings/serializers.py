@@ -1,19 +1,20 @@
 import json
 
 from django.contrib.gis.geos import GEOSGeometry, Polygon
+from django.db.models import QuerySet
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from rest_framework.request import Request
 
 from api_buldings.models import Building
 
 
 class BuildingSerializer(serializers.ModelSerializer):
+    area = serializers.SerializerMethodField()
+    distance = serializers.SerializerMethodField()
+
     class Meta:
         model = Building
-        fields = ("id", "address", "geom")
-        id_field = "id"
-        geo_field = "geom"
+        fields = ("id", "address", "geom", "area", "distance")
 
     def to_internal_value(self, data):
         if data.get("address") or data.get("geom"):
@@ -39,8 +40,21 @@ class BuildingSerializer(serializers.ModelSerializer):
 
         for coord in polygon.coords[0]:
             if not (-180.0 <= coord[0] <= 180.0 and -90.0 <= coord[1] <= 90.0):
-                raise ValidationError(["Coordinates out of range: longitude must be between -180 and 180, latitude must be between -90 and 90"])
+                raise ValidationError([
+                                          "Coordinates out of range: longitude must be between -180 and 180, latitude must be between -90 and 90"])
         return polygon
+
+    def get_area(self, obj):
+        area = getattr(obj, 'area', None)
+        if area is None:
+            return None
+        return area.sq_m
+
+    def get_distance(self, obj):
+        distance = getattr(obj, 'distance', None)
+        if distance is None:
+            return None
+        return distance.m
 
     def parse_feature(self, data: dict):
         internal_value = {}
@@ -53,13 +67,8 @@ class BuildingSerializer(serializers.ModelSerializer):
         internal_value.update(data["properties"])
         return internal_value
 
-    def get_fields(self):
-        fields = super(BuildingSerializer, self).get_fields()
-        request: Request = self.context.get("request")
-        return fields
-
     def to_representation(self, instance):
-        if isinstance(instance, list):
+        if isinstance(instance, QuerySet):
             feature_collection = {
                 "type": "FeatureCollection",
                 "features": [self.to_representation_single(obj) for obj in instance]
@@ -69,21 +78,17 @@ class BuildingSerializer(serializers.ModelSerializer):
             return self.to_representation_single(instance)
 
     def to_representation_single(self, instance):
-        target_fields = self.get_fields()
+        serialize_data = super().to_representation(instance)
 
-        properties = {}
-        for target_field in target_fields:
-            if target_field not in (self.Meta.id_field, self.Meta.geo_field):
-                try:
-                    value = instance.__getattribute__(target_field)
-                    properties[target_field] = value
-                except:
-                    continue
+        proprieties = {}
+        for atr in serialize_data:
+            if atr not in ["id", "geom"] and serialize_data[atr] is not None:
+                proprieties[atr] = serialize_data[atr]
 
         result = {
             "type": "Feature",
             "geometry": json.loads(instance.geom.json),
             "id": instance.pk,
-            "properties": properties
+            "properties": proprieties
         }
         return result
