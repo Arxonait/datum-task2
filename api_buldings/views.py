@@ -30,15 +30,7 @@ class BuildingViewSet(viewsets.ModelViewSet):
         return Response(feature)
 
     def list(self, request, *args, **kwargs):
-
         queryset = self.filter_queryset(self.get_queryset())
-
-        features = [self.serializer_class(instance, context=self.get_serializer_context()).data
-                    for instance in queryset]
-        feature_collection = {
-            "type": "FeatureCollection",
-            "features": features
-        }
-
+        feature_collection = self.serializer_class(list(queryset), context=self.get_serializer_context()).data
         return Response(feature_collection)
 

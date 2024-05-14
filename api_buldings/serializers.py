@@ -1,6 +1,6 @@
 import json
 
-from django.contrib.gis.geos import GEOSGeometry
+from django.contrib.gis.geos import GEOSGeometry, Polygon
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.request import Request
@@ -31,18 +31,15 @@ class BuildingSerializer(serializers.ModelSerializer):
         except Exception as e:
             raise ValidationError([str(e)])
 
-        if polygon.geom_type != "Polygon":
-            raise ValidationError(["geom must be Polygon"])
+        if not isinstance(polygon, Polygon):
+            raise ValidationError(["geom must be a Polygon"])
 
-        if polygon.srid != 4326:
-            raise ValidationError(["geom must be srid:4326"])
+        if not polygon.valid:
+            raise ValidationError([f"geom is not a valid polygon: {polygon.valid_reason}"])
 
         for coord in polygon.coords[0]:
-            if not (isinstance(coord[0], float) and isinstance(coord[1], float)):
-                raise ValidationError(["longitude, latitude must be float"])
-            if not (-180. < coord[0] < 180. and -90. < coord[1] < 90.):
-                raise ValidationError(["wrong range longitude, latitude"])
-
+            if not (-180.0 <= coord[0] <= 180.0 and -90.0 <= coord[1] <= 90.0):
+                raise ValidationError(["Coordinates out of range: longitude must be between -180 and 180, latitude must be between -90 and 90"])
         return polygon
 
     def parse_feature(self, data: dict):
@@ -62,6 +59,16 @@ class BuildingSerializer(serializers.ModelSerializer):
         return fields
 
     def to_representation(self, instance):
+        if isinstance(instance, list):
+            feature_collection = {
+                "type": "FeatureCollection",
+                "features": [self.to_representation_single(obj) for obj in instance]
+            }
+            return feature_collection
+        else:
+            return self.to_representation_single(instance)
+
+    def to_representation_single(self, instance):
         target_fields = self.get_fields()
 
         properties = {}
@@ -75,7 +82,7 @@ class BuildingSerializer(serializers.ModelSerializer):
 
         result = {
             "type": "Feature",
-            "geometry": instance.geom.geojson,
+            "geometry": json.loads(instance.geom.json),
             "id": instance.pk,
             "properties": properties
         }
