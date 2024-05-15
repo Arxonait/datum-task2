@@ -1,5 +1,5 @@
 # Тестовое задание 2 DATUM Group
-Необходим PostgreSQL/PostGIS и геоинформационная библиотека gdal
+Необходим PostgreSQL/PostGIS и геоинформационная библиотека gdal, OSGeo4W
 
 Установка
 ```
