@@ -96,10 +96,6 @@ class BuildingsCRUDTestsCollection(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["properties"].get("address"), change_address)
 
-
-class BuildingsFilterTestsCollection(TestCase):
-    fixtures = ["buildings"]
-
     def test_get_buildings(self):
         url = "/api/buildings/"
 
@@ -110,6 +106,31 @@ class BuildingsFilterTestsCollection(TestCase):
         count_response = len(response.json()["features"])
         self.assertEqual(count, count_response)
 
+    def test_get_target_building_and_format_feature(self):
+        url = "/api/buildings/14/"
+
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertIsInstance(data.get("type"), str)
+        self.assertEqual(data.get("type"), "Feature")
+        self.assertIsInstance(data.get("geometry"), dict)
+        self.assertIsInstance(data["geometry"].get("coordinates"), list)
+        self.assertIsInstance(data["geometry"].get("type"), str)
+        self.assertEqual(data["geometry"].get("type").lower(), "polygon")
+        self.assertIsInstance(data.get("properties"), dict)
+
+    def test_get_target_building_not_found(self):
+        url = "/api/buildings/50/"
+
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+
+class BuildingsFilterTestsCollection(TestCase):
+    fixtures = ["buildings"]
+
     def test_building_area(self):
         url = "/api/buildings/13/?area"
 
@@ -117,7 +138,7 @@ class BuildingsFilterTestsCollection(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "area", 1)
 
-    def test_get_building_area_with_filter(self):
+    def test_get_target_building_area_with_filter(self):
         min_area = 500
         url = f"/api/buildings/13/?area&{min_area=}"
 
@@ -126,8 +147,7 @@ class BuildingsFilterTestsCollection(TestCase):
         self.assertContains(response, "area", 1)
         self.assertGreater(response.json()["properties"]["area"], min_area)
 
-    def test_buildings_filtrate(self):
-        buildings = Building.objects.all()
+    def test_get_buildings_filtrate(self):
 
         # test_data --- min area, max area
         test_data = [(500, 2000), (1000, None), (None, 1000), (5000, 2000)]
@@ -153,7 +173,7 @@ class BuildingsFilterTestsCollection(TestCase):
                 self.assertGreater(max_area, feature_area)
                 self.assertLess(min_area, feature_area)
 
-    def test_get_building_with_filter_point(self):
+    def test_get_target_building_with_filter_point(self):
         longitude, latitude = TEST_POINT1
         max_distance = 50
         url = f"/api/buildings/13/?{max_distance=}&{longitude=}&{latitude=}"
@@ -203,3 +223,16 @@ class BuildingsFilterTestsCollection(TestCase):
             for feature in features:
                 distance_to_target_point = feature["properties"]["distance"]
                 self.assertLess(distance_to_target_point, max_distance)
+
+    def test_get_calc_field_area(self):
+        url = f"/api/buildings/13/?area&"
+        response = self.client.get(url)
+        data = response.json()
+        self.assertIsInstance(data["properties"].get("area"), float)
+
+    def test_get_calc_field_distance_target_point(self):
+        longitude, latitude = TEST_POINT1
+        url = f"/api/buildings/13/?{longitude=}&{latitude=}"
+        response = self.client.get(url)
+        data = response.json()
+        self.assertIsInstance(data["properties"].get("distance"), float)

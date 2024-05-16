@@ -1,5 +1,4 @@
 import django_filters
-from django.contrib.gis.db.models.functions import Distance, Area
 from django.contrib.gis.geos import Point
 from django.http import Http404
 from rest_framework import viewsets

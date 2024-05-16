@@ -83,7 +83,7 @@ class BuildingSerializer(serializers.ModelSerializer):
         return queryset
 
     def to_representation(self, queryset: QuerySet):
-        if not isinstance(queryset, QuerySet) and self.single == True:
+        if not isinstance(queryset, QuerySet) and self.single:
             return self.to_representation_single(queryset)
 
         instances = self.change_queryset_serializers_context(queryset)
